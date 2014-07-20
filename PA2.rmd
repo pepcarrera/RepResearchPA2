@@ -8,9 +8,19 @@ It is sourced from the Coursera site.
 
 
 ```{r}
+#Download file and decompress
 url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 file <- basename(url)
-download.file(url, file)
-
-activity <- read.csv("activity.csv", header=TRUE, na.strings="NA")
+download.file(url, file, method="curl")
+fcon <- bzfile(file, open="r")
+#Read CSV file
+stormData <-read.csv(fcon, stringsAsFactors=FALSE)
+close(fcon)
+#Keep relevant columns
+stormData <- stormData[, c("BGN_DATE", "STATE", "EVTYPE", "END_DATE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+#Remove non US-states such as PR and ST in the data
+stormData <- stormData[(stormData$STATE %in% c(state.abb, "DC")), ]
 ```
+
+##Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
