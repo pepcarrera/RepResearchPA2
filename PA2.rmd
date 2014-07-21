@@ -2,6 +2,7 @@
 
 ```{r}
 library("ggplot2")
+library("reshape2")
 ```
 
 ## Loading and preprocessing the data
@@ -53,7 +54,7 @@ stormData$EVTYPE <- gsub("icy road", "ice road", stormData$EVTYPE)
 ##Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
 Given the graph below, torandic events are clearly most harmful to population health.
-```{r}
+```{r, fig.width=20}
 stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, data = stormData)
 stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & stormHealth$INJURIES == 0),]
 meltStormHealth <- melt(stormHealth, id="EVTYPE", variable.name="Health_Type", value.name="Number_Of_Incidents")
