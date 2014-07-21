@@ -1,5 +1,9 @@
 # Reproducible Research: Peer Assessment 2
 
+```{r}
+library("ggplot2")
+```
+
 ## Loading and preprocessing the data
 
 The data for this assignment come in the form of a comma-separated-value file 
@@ -20,7 +24,38 @@ close(fcon)
 stormData <- stormData[, c("BGN_DATE", "STATE", "EVTYPE", "END_DATE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
 #Remove non US-states such as PR and ST in the data
 stormData <- stormData[(stormData$STATE %in% c(state.abb, "DC")), ]
+#Convert END_DATE and BGN_DATE to dates
+stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, format="%m/%d/%Y")
+stormData$END_DATE <- as.Date(stormData$END_DATE, format="%m/%d/%Y")
+#Lowercase EVTYPE
+stormData$EVTYPE <- tolower(stormData$EVTYPE)
+#Clean up EVTYPE
+stormData$EVTYPE <- gsub("avalance", "avalanche", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("/", " ", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("coastalstorm", "coastal storm", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("  ", " ", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("^ ", "", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("rip currents heavy surf", "rip current", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("record excessive heat", "record heat", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("s+$", "", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("winter weather mix", "winter mix", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("wintry mix", "winter mix", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("wind storm", "wind", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("urban and small stream floodin", "urban sml stream fld", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("thunderstorm wind (g40)", "thunderstorm wind", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("thunderstorm wind 13", "thunderstorm wind", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("thunderstorm wind g52", "thunderstorm wind", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("thunderstormw", "thunderstorm wind", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("ice on road", "ice road", stormData$EVTYPE)
+stormData$EVTYPE <- gsub("icy road", "ice road", stormData$EVTYPE)
 ```
 
 ##Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
+Given the graph below, torandic events are clearly most harmful to population health.
+```{r}
+stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, data = stormData)
+stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & stormHealth$INJURIES == 0),]
+meltStormHealth <- melt(stormHealth, id="EVTYPE", variable.name="Health_Type", value.name="Number_Of_Incidents")
+ggplot(meltStormHealth, aes(EVTYPE)) + geom_line(aes(y=Number_Of_Incidents, group = Health_Type, color=Health_Type)) + ggtitle("Health Incidents Accross the US by Event Type") + theme(text = element_text(size=10), axis.text.x = element_text(angle=90, vjust=1, hjust=1))
+```
