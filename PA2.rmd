@@ -2,9 +2,10 @@
 
 ```{r}
 library("ggplot2")
+library("reshape2")
 ```
 
-## Loading and preprocessing the data
+## Loading the data
 
 The data for this assignment come in the form of a comma-separated-value file 
 compressed via the bzip2 algorithm to reduce its size.  
@@ -20,6 +21,10 @@ fcon <- bzfile(file, open="r")
 #Read CSV file
 stormData <-read.csv(fcon, stringsAsFactors=FALSE)
 close(fcon)
+```
+
+## Categorize and process the data
+```{r}
 #Keep relevant columns
 stormData <- stormData[, c("BGN_DATE", "STATE", "EVTYPE", "END_DATE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
 #Remove non US-states such as PR and ST in the data
@@ -29,33 +34,70 @@ stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, format="%m/%d/%Y")
 stormData$END_DATE <- as.Date(stormData$END_DATE, format="%m/%d/%Y")
 #Lowercase EVTYPE
 stormData$EVTYPE <- tolower(stormData$EVTYPE)
-#Clean up EVTYPE
-stormData$EVTYPE <- gsub("avalance", "avalanche", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("/", " ", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("coastalstorm", "coastal storm", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("  ", " ", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("^ ", "", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("rip currents heavy surf", "rip current", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("record excessive heat", "record heat", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("s+$", "", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("winter weather mix", "winter mix", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("wintry mix", "winter mix", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("wind storm", "wind", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("urban and small stream floodin", "urban sml stream fld", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("thunderstorm wind (g40)", "thunderstorm wind", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("thunderstorm wind 13", "thunderstorm wind", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("thunderstorm wind g52", "thunderstorm wind", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("thunderstormw", "thunderstorm wind", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("ice on road", "ice road", stormData$EVTYPE)
-stormData$EVTYPE <- gsub("icy road", "ice road", stormData$EVTYPE)
+#Remove non-pertinent Weather events (no human, property, or crop damage)
+stormData <- stormData[!(stormData$FATALITIES == 0 & stormData$INJURIES == 0 & stormData$PROPDMG == 0 & stormData$CROPDMG == 0),]
+
+#Categorize the events from least specific to most
+stormData[grepl("turbulence|apache|urban|normal|hyperthermia|record temperatures|other|dam|southeast|beach|drowning|none|severe|\\?|mild|excessive|record", stormData$EVTYPE), "Category"] <- "Other Events"
+stormData[grepl("dry|drought", stormData$EVTYPE), "Category"] <- "Very Dry/Drought"
+stormData[grepl("marine|rough|southeast|seiche|stream|heavy seas|wave", stormData$EVTYPE), "Category"] <- "Sea/Lake/River Events"
+stormData[grepl("summary|metro", stormData$EVTYPE), "Category"] <- "Summary of Date"
+stormData[grepl("warm|heat|hot|high|warmth", stormData$EVTYPE), "Category"] <- "Heat Events"
+stormData[grepl("heavy mix|snow|sleet|wintry|winter|cold|cool|freezing|blizzard|freeze|low", stormData$EVTYPE), "Category"] <- "Cold/Snow/Winter Weather/Blizzard"
+stormData[grepl("rainfall|rain|precip|precipatation|precipitation|wet", stormData$EVTYPE), "Category"] <- "Rain & Percipatation"
+stormData[grepl("fog", stormData$EVTYPE), "Category"] <- "Fog"
+stormData[grepl("cloud", stormData$EVTYPE), "Category"] <- "Cloud Related Events"
+stormData[grepl("dust", stormData$EVTYPE), "Category"] <- "Dust Related Events"
+stormData[grepl("floodin|stream fld|flood|rapidly|flash", stormData$EVTYPE), "Category"] <- "Flood"
+stormData[grepl("torndao|tornado|funnel|spout|gustnado", stormData$EVTYPE), "Category"] <- "Tornado/Gustnado/Funnel Cloud/Waterspout"
+stormData[grepl("avalance|avalanche", stormData$EVTYPE), "Category"] <- "Avalanche"
+stormData[grepl("coastalstorm|coastal storm", stormData$EVTYPE), "Category"] <- "Coastal Storm"
+stormData[grepl("thunderstorm|tstm|thunderstormw|lightning|lighting|ligntning", stormData$EVTYPE), "Category"] <- "Thunderstorms/Lightning"
+stormData[grepl("glaze|frost|ice|icy", stormData$EVTYPE), "Category"] <- "Ice Events"
+stormData[grepl("wind|burst", stormData$EVTYPE), "Category"] <- "Wind, Microbursts, and Downburst Events"
+stormData[grepl("hail", stormData$EVTYPE), "Category"] <- "Hail Events"
+stormData[grepl("hurricane", stormData$EVTYPE), "Category"] <- "Hurricanes"
+stormData[grepl("current|tide|surf|surge", stormData$EVTYPE), "Category"] <- "Currents, Surfs, and Tides"
+stormData[grepl("fires|wildfire|fire|smoke", stormData$EVTYPE), "Category"] <- "Fires/Smoke"
+stormData[grepl("mud|rock|mudslides|landslide|landslump|erosion", stormData$EVTYPE), "Category"] <- "Rock/Mud/Landslides & Erosion"
+stormData[grepl("tropical storm|depression", stormData$EVTYPE), "Category"] <- "Tropical Storms/Depressions"
+stormData[grepl("tsunami", stormData$EVTYPE), "Category"] <- "Tsunami"
 ```
+
 
 ##Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
 Given the graph below, torandic events are clearly most harmful to population health.
 ```{r}
-stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, data = stormData)
+library(grid)
+library(gridExtra)
+
+#Plot All Events by Category
+stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ Category, sum, data = stormData)
 stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & stormHealth$INJURIES == 0),]
-meltStormHealth <- melt(stormHealth, id="EVTYPE", variable.name="Health_Type", value.name="Number_Of_Incidents")
-ggplot(meltStormHealth, aes(EVTYPE)) + geom_line(aes(y=Number_Of_Incidents, group = Health_Type, color=Health_Type)) + ggtitle("Health Incidents Accross the US by Event Type") + theme(text = element_text(size=10), axis.text.x = element_text(angle=90, vjust=1, hjust=1))
+meltStormHealth <- melt(stormHealth, id="Category", variable.name="Health_Type", value.name="Number_Of_Incidents")
+p1 <- qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, data=meltStormHealth, geom="bar", stat="identity") + coord_flip()
+
+#Break down the "Other Category"
+stormOtherHealth <- stormData[(stormData$Category == "Other Events"),]
+stormOtherHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, data = stormOtherHealth)
+stormOtherHealth <- stormOtherHealth[!(stormOtherHealth$FATALITIES == 0 & stormOtherHealth$INJURIES == 0),]
+meltStormOtherHealth <- melt(stormOtherHealth, id="EVTYPE", variable.name="Health_Type", value.name="Number_Of_Incidents")
+p2 <- qplot(x=EVTYPE, y=Number_Of_Incidents, fill=Health_Type, data=meltStormOtherHealth, geom="bar", stat="identity") + coord_flip() + xlab("Event Type")
+
+grid.arrange(p1, p2, ncol = 1, main = "Health Events (Left= All Event Types, Right=Fine Grain Detail of Other category)"
+```
+
+As shown in the table below, see the highest number of incidents by type
+```{r, results='asis'}
+library(knitr)
+##Create two data frames, fatalities and injuries sorted by the highest counts at the top
+fatalities <- meltStormHealth[meltStormHealth$Health_Type == "FATALITIES",]
+fatalities <- fatalities[order(fatalities$Number_Of_Incidents, decreasing=TRUE),]
+injuries <- meltStormHealth[meltStormHealth$Health_Type == "INJURIES",]
+injuries <- injuries[order(injuries$Number_Of_Incidents, decreasing=TRUE),]
+t1 = kable(fatalities, format='html', output = FALSE)
+t2 = kable(injuries, format='html', output = FALSE)
+cat(c('<table><tr valign="top"><td>', t1, '</td><td>', t2, '</td><tr></table>'),
+    sep = '')
 ```
