@@ -1,4 +1,8 @@
-# Reproducible Research: Peer Assessment 2
+# Health & Economic Impact of Storm Events from early 1950 through November 2011
+
+##Synopsis
+
+In this reprot we aim to describe the health impact of storm events between 1950 and Novermber 2011.  Our overall hypothesis is that tornadic events have the highest impact to human health, as measured by injuries and fatalities.  
 
 ##Load required libraries for data processing and visualization
 ```{r}
@@ -9,14 +13,14 @@ library("grid")
 library("gridExtra")
 ```
 
-## Loading the data
+#Data Processing
 
 The data for this assignment come in the form of a comma-separated-value file 
 compressed via the bzip2 algorithm to reduce its size.  
 It is sourced from the Coursera site.
 
 
-```{r}
+```{r, cache=TRUE}
 #Download file and decompress
 url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 file <- basename(url)
@@ -89,6 +93,8 @@ stormData[grepl("tropical storm|depression", stormData$EVTYPE), "Category"] <-
 stormData[grepl("tsunami", stormData$EVTYPE), "Category"] <- "Tsunami"
 ```
 
+
+#Results
 
 ##Across the United States, which types of events are most harmful with respect to population health?
 
