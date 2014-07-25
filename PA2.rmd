@@ -90,13 +90,12 @@ stormData[grepl("tsunami", stormData$EVTYPE), "Category"] <- "Tsunami"
 ```
 
 
-##Across the United States, which types of events (as indicated in the EVTYPE variable) 
-##are most harmful with respect to population health?
+##Across the United States, which types of events are most harmful with respect to population health?
 
-Given the graph below, torandic events are clearly most harmful to population 
+Given the two graphs below, torandic events are clearly most harmful to population 
 health.
 
-```{r}
+```{r, fig.height=20}
 
 #Plot All Events by Category
 stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ Category, sum, data = 
@@ -109,40 +108,45 @@ meltStormHealth <- melt(stormHealth, id="Category", variable.name="Health_Type",
 p1 <- qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, 
         data=meltStormHealth, geom="bar", stat="identity") + coord_flip()
 
-#Break down the "Other Category"
-stormOtherHealth <- stormData[(stormData$Category == "Other Events"),]
-stormOtherHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, 
-        data = stormOtherHealth)
-stormOtherHealth <- stormOtherHealth[!(stormOtherHealth$FATALITIES == 0 & 
-        stormOtherHealth$INJURIES == 0),]
+#Break down the "Largest Category"
+stormLargeHealth <- stormData[(stormData$Category == 
+        "Tornado/Gustnado/Funnel Cloud/Waterspout"),]
+stormLargeHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, 
+        data = stormLargeHealth)
+stormLargeHealth <- stormLargeHealth[!(stormLargeHealth$FATALITIES == 0 & 
+        stormLargeHealth$INJURIES == 0),]
 #Melt data by category to allow for an easy barplot
-meltStormOtherHealth <- melt(stormOtherHealth, id="EVTYPE", 
+meltStormLargeHealth <- melt(stormLargeHealth, id="EVTYPE", 
         variable.name="Health_Type", value.name="Number_Of_Incidents")
 p2 <- qplot(x=EVTYPE, y=Number_Of_Incidents, fill=Health_Type, 
-        data=meltStormOtherHealth, geom="bar", stat="identity") + 
+        data=meltStormLargeHealth, geom="bar", stat="identity") + 
         coord_flip() + xlab("Event Type")
 
 grid.arrange(p1, p2, ncol = 1, main = "Health Events (Top= All Event Types, 
-        Bottom=Fine Grain Detail of Other category)")
+        Bottom=Fine Grain Detail of Tornado/Gustnado/Funnel Cloud/Waterspoint category)")
 ```
 
-As shown in the table below, see the highest number of incidents by type, it continues 
+As shown in the table below, see the highest number of incidents by type, 
+it continues to show Tornado as the deadliest
+
 ```{r, results='asis'}
 #Create two data frames, fatalities and injuries sorted by the highest counts at the top
 meltFatalities <- meltStormHealth[meltStormHealth$Health_Type == "FATALITIES",]
-meltFatalities <- fatalities[order(fatalities$Number_Of_Incidents, decreasing=TRUE),]
+meltFatalities <- meltFatalities[order(meltFatalities$Number_Of_Incidents, decreasing=TRUE),]
 
-#Start new data framr with just number of incidnets and make categories the rowname
+#Start new data frame with just number of incidnets and make categories the rowname
 fatalities <- data.frame(meltFatalities$Number_Of_Incidents)
 rownames(fatalities) <- meltFatalities$Category
+colnames(fatalities) <- "Number of Fatalities"
 
 #Start creating melted Injuries focued data frame
 meltInjuries <- meltStormHealth[meltStormHealth$Health_Type == "INJURIES",]
-meltInjuries <- injuries[order(injuries$Number_Of_Incidents, decreasing=TRUE),]
+meltInjuries <- meltInjuries[order(meltInjuries$Number_Of_Incidents, decreasing=TRUE),]
 
-#Start new data framr with just number of incidnets and make categories the rowname
+#Start new data frame with just number of incidnets and make categories the rowname
 injuries <- data.frame(meltInjuries$Number_Of_Incidents)
 rownames(fatalities) <- meltInjuries$Category
+colnames(injuries) <- "Number of Injuries"
 
 #output the tables in html
 t1 = kable(fatalities, format='html', output = FALSE)
