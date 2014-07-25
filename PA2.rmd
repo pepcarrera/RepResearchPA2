@@ -42,6 +42,9 @@ stormData <- stormData[(stormData$STATE %in% c(state.abb, "DC")), ]
 #Convert END_DATE and BGN_DATE to dates
 stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, format="%m/%d/%Y")
 stormData$END_DATE <- as.Date(stormData$END_DATE, format="%m/%d/%Y")
+#Convert PROPDMGEXP and CROPDMGEXP to factors
+stormData$PROPDMGEXP <- as.factor(stormData$PROPDMGEXP)
+stormData$CROPDMGEXP <- as.factor(stormData$CROPDMGEXP)
 #Lowercase EVTYPE
 stormData$EVTYPE <- tolower(stormData$EVTYPE)
 #Remove non-pertinent Weather events (no human, property, or crop damage)
@@ -158,4 +161,39 @@ colnames(injuries) <- "Number of Injuries"
 t1 = kable(fatalities, format='html', output = FALSE)
 t2 = kable(injuries, format='html', output = FALSE)
 cat(c('<table><tr valign="top"><td>', t1, '</td><td>', t2, '</td><tr></table>'), sep = '')
+```
+
+##Across the United States, which types of events have the greatest economic consequences?
+
+```{r, fig.height=20}
+
+#Plot All Events by Category
+stormPropEcom <- stormData[!(stormData$PROPDMG == 0),]
+stormCropEcom <- stormData[!(stormData$CROPDMG == 0),]
+stormEcom <- aggregate(cbind(PROPDMG, PROPDMGEXP, CROPDMG) ~ Category, sum, data = 
+        stormData)
+stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & 
+        stormHealth$INJURIES == 0),]
+#Melt data by category to allow for an easy barplot
+meltStormHealth <- melt(stormHealth, id="Category", variable.name="Health_Type", 
+        value.name="Number_Of_Incidents")
+p1 <- qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, 
+        data=meltStormHealth, geom="bar", stat="identity") + coord_flip()
+
+#Break down the "Largest Category"
+stormLargeHealth <- stormData[(stormData$Category == 
+        "Tornado/Gustnado/Funnel Cloud/Waterspout"),]
+stormLargeHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, 
+        data = stormLargeHealth)
+stormLargeHealth <- stormLargeHealth[!(stormLargeHealth$FATALITIES == 0 & 
+        stormLargeHealth$INJURIES == 0),]
+#Melt data by category to allow for an easy barplot
+meltStormLargeHealth <- melt(stormLargeHealth, id="EVTYPE", 
+        variable.name="Health_Type", value.name="Number_Of_Incidents")
+p2 <- qplot(x=EVTYPE, y=Number_Of_Incidents, fill=Health_Type, 
+        data=meltStormLargeHealth, geom="bar", stat="identity") + 
+        coord_flip() + xlab("Event Type")
+
+grid.arrange(p1, p2, ncol = 1, main = "Health Events (Top= All Event Types, 
+        Bottom=Fine Grain Detail of Tornado/Gustnado/Funnel Cloud/Waterspoint category)")
 ```
