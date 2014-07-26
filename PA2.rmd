@@ -2,7 +2,7 @@
 
 ##Synopsis
 
-In this reprot we aim to describe the health impact of storm events between 1950 and Novermber 2011.  Our overall hypothesis is that tornadic events have the highest impact to human health, as measured by injuries and fatalities.  
+In this reprot we aim to describe the health impact of storm events between 1950 and Novermber 2011.  Our overall hypothesis is that tornadic events have the highest impact to human health, as measured by injuries and fatalities and that floods have the highest financial damage as measured by crop and property damage.  
 
 ##Load required libraries for data processing and visualization
 ```{r}
@@ -32,19 +32,26 @@ close(fcon)
 ```
 
 ## Categorize and process the data
+Only relevant columns are retained for purposes of either data processing or analysis.  
+
+The columns retained for filtering are: STATE (we then filter on only US states, removing properties and other non-US State date).
+
+The columns retained for health analysis are: EVTYPE, FATALITIES, and INJURIES.  We later use EVTYPE to create categories of event types to display events.  FATALITIES and INJURIES form the basis of the data we would analyze for Health Incidents.
+
+The columns retained for economic analysis are: EVTYPE, PROPDMG, CROPDMG, PROPDMGEXP, and CROPDMGEXP.  We later use EVTYPE to create categories of event types to display events.  PROPDMG and CROPDMG are base financial data points, and PROPDMGEXP alogn with CROPDMGEXP are interpreted later in data processing to get the correct financial impact figures.
+
+
 ```{r}
 #Keep relevant columns
-stormData <- stormData[, c("BGN_DATE", "STATE", "EVTYPE", "END_DATE", 
-        "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", 
-        "CROPDMGEXP")]
+stormData <- stormData[, c("STATE", "EVTYPE","FATALITIES", "INJURIES", "PROPDMG", 
+        "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
 #Remove non US-states such as PR and ST in the data
 stormData <- stormData[(stormData$STATE %in% c(state.abb, "DC")), ]
-#Convert END_DATE and BGN_DATE to dates
-stormData$BGN_DATE <- as.Date(stormData$BGN_DATE, format="%m/%d/%Y")
-stormData$END_DATE <- as.Date(stormData$END_DATE, format="%m/%d/%Y")
-#Convert PROPDMGEXP and CROPDMGEXP to factors
-stormData$PROPDMGEXP <- as.factor(stormData$PROPDMGEXP)
-stormData$CROPDMGEXP <- as.factor(stormData$CROPDMGEXP)
+
+#Convert Property Damanage and Crop Damage columns to characters
+stormData$PROPDMGEXP <- as.character(stormData$PROPDMGEXP)
+stormData$CROPDMGEXP <- as.character(stormData$CROPDMGEXP)
+
 #Lowercase EVTYPE
 stormData$EVTYPE <- tolower(stormData$EVTYPE)
 #Remove non-pertinent Weather events (no human, property, or crop damage)
@@ -96,17 +103,9 @@ stormData[grepl("tropical storm|depression", stormData$EVTYPE), "Category"] <-
 stormData[grepl("tsunami", stormData$EVTYPE), "Category"] <- "Tsunami"
 ```
 
+Creat a stormHealth specific data set that aggregate the events by category that relate to fatalities and injuries, while removing all data from this data frame that has 0 of both types.  We then create a data frame that is ready for plotting with the rolled up categories and the health event types.
 
-#Results
-
-##Across the United States, which types of events are most harmful with respect to population health?
-
-Given the two graphs below, torandic events are clearly most harmful to population 
-health.
-
-```{r, fig.height=20}
-
-#Plot All Events by Category
+```{r}
 stormHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ Category, sum, data = 
         stormData)
 stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & 
@@ -114,31 +113,11 @@ stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 &
 #Melt data by category to allow for an easy barplot
 meltStormHealth <- melt(stormHealth, id="Category", variable.name="Health_Type", 
         value.name="Number_Of_Incidents")
-p1 <- qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, 
-        data=meltStormHealth, geom="bar", stat="identity") + coord_flip()
-
-#Break down the "Largest Category"
-stormLargeHealth <- stormData[(stormData$Category == 
-        "Tornado/Gustnado/Funnel Cloud/Waterspout"),]
-stormLargeHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, 
-        data = stormLargeHealth)
-stormLargeHealth <- stormLargeHealth[!(stormLargeHealth$FATALITIES == 0 & 
-        stormLargeHealth$INJURIES == 0),]
-#Melt data by category to allow for an easy barplot
-meltStormLargeHealth <- melt(stormLargeHealth, id="EVTYPE", 
-        variable.name="Health_Type", value.name="Number_Of_Incidents")
-p2 <- qplot(x=EVTYPE, y=Number_Of_Incidents, fill=Health_Type, 
-        data=meltStormLargeHealth, geom="bar", stat="identity") + 
-        coord_flip() + xlab("Event Type")
-
-grid.arrange(p1, p2, ncol = 1, main = "Health Events (Top= All Event Types, 
-        Bottom=Fine Grain Detail of Tornado/Gustnado/Funnel Cloud/Waterspoint category)")
 ```
 
-As shown in the table below, see the highest number of incidents by type, 
-it continues to show Tornado as the deadliest
+As a last step for the health data, we create a sorted table for later display to simply show the same data in table format.
 
-```{r, results='asis'}
+```{r}
 #Create two data frames, fatalities and injuries sorted by the highest counts at the top
 meltFatalities <- meltStormHealth[meltStormHealth$Health_Type == "FATALITIES",]
 meltFatalities <- meltFatalities[order(meltFatalities$Number_Of_Incidents, decreasing=TRUE),]
@@ -156,7 +135,70 @@ meltInjuries <- meltInjuries[order(meltInjuries$Number_Of_Incidents, decreasing=
 injuries <- data.frame(meltInjuries$Number_Of_Incidents)
 rownames(fatalities) <- meltInjuries$Category
 colnames(injuries) <- "Number of Injuries"
+```
 
+To process the data appropriately, it's important that we convert the PROPDMGEXP and CROPDMGEXP columns.  Based on the data and the write up, it is assumed that the EXP columns are either numbers representing the number of zeros to add to the damage estimate or letter codes.  For the letter codes:
+
+h and H = 100
+K and K = 1000
+m and M = 1,000,000
+b and B = 1,000,000,000
+
+All other characters are assumed to be mistakes and therefore PROPDMG and CROPDMG are multiplies by 1.
+
+```{r}
+#Remove data with 0 Prop and Crop Damage
+stormEcon <- stormData[!(stormData$PROPDMG == 0 & stormData$CROPDMG ==0),]
+#Convert PROPDMGEXP column to $ multiplier
+stormEcon[stormEcon$PROPDMGEXP == "" | stormEcon$PROPDMGEXP == "-" | stormEcon$PROPDMGEXP == "+" | stormEcon$PROPDMGEXP == "?" | stormEcon$PROPDMGEXP == "0", "PROPDMGEXP"] <- 1
+stormEcon[stormEcon$PROPDMGEXP == "2" | stormEcon$PROPDMGEXP == "h" | stormEcon$PROPDMGEXP == "H", "PROPDMGEXP"] <- 100
+stormEcon[stormEcon$PROPDMGEXP == "3" | stormEcon$PROPDMGEXP == "k" | stormEcon$PROPDMGEXP == "K", "PROPDMGEXP"] <- 1000
+stormEcon[stormEcon$PROPDMGEXP == "4", "PROPDMGEXP"] <- 10000
+stormEcon[stormEcon$PROPDMGEXP == "5", "PROPDMGEXP"] <- 100000
+stormEcon[stormEcon$PROPDMGEXP == "6" | stormEcon$PROPDMGEXP == "m" | stormEcon$PROPDMGEXP == "M", "PROPDMGEXP"] <- 1e+06
+stormEcon[stormEcon$PROPDMGEXP == "7", "PROPDMGEXP"] <- 1e+07
+stormEcon[stormEcon$PROPDMGEXP == "8", "PROPDMGEXP"] <- 1e+08
+stormEcon[stormEcon$PROPDMGEXP == "b" | stormEcon$PROPDMGEXP == "B", "PROPDMGEXP"] <- 1e+09
+#Convert CROPDMGEXP column to $ multiplier
+stormEcon[stormEcon$CROPDMGEXP == "" | stormEcon$CROPDMGEXP == "?" | stormEcon$CROPDMGEXP == "0", "CROPDMGEXP"] <- 1
+stormEcon[stormEcon$CROPDMGEXP == "3" | stormEcon$CROPDMGEXP == "k" | stormEcon$CROPDMGEXP == "K", "CROPDMGEXP"] <- 1000
+stormEcon[stormEcon$CROPDMGEXP == "6" | stormEcon$CROPDMGEXP == "m" | stormEcon$CROPDMGEXP == "M", "CROPDMGEXP"] <- 1e+06
+stormEcon[stormEcon$CROPDMGEXP == "b" | stormEcon$CROPDMGEXP == "B", "CROPDMGEXP"] <- 1e+09
+#Convert PROPDMGEXP and CROPDMGEXP to numeric
+stormEcon$PROPDMGEXP <- as.numeric(stormEcon$PROPDMGEXP)
+stormEcon$CROPDMGEXP <- as.numeric(stormEcon$CROPDMGEXP)
+#Multipy to get true property and crop damage
+stormEcon$CROPDMG <- stormEcon$CROPDMGEXP * stormEcon$CROPDMG
+stormEcon$PROPDMG <- stormEcon$PROPDMGEXP * stormEcon$PROPDMG
+```
+
+We then take the work above and prep the data to be plotted
+
+```{r}
+stormEconAgg <- aggregate(cbind(PROPDMG, CROPDMG) ~ Category, sum, data = 
+        stormEcon)
+#Create a Total Damage column
+stormEconAgg$Total_Damage <- stormEconAgg$PROPDMG + stormEconAgg$CROPDMG
+colnames(stormEconAgg) <- c("Category", "Property_Damage", "Crop_Damage", "Total_Damage")
+```
+
+#Results
+
+##Across the United States, which types of events are most harmful with respect to population health?
+
+Given the barplot below, torandic events are clearly most harmful to population 
+health.
+
+```{r}
+qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, data=meltStormHealth, 
+        geom="bar", stat="identity") + 
+        ggtitle("Health Events, Fatalities and Injuries, shown by Categorized Event Type") + coord_flip()
+```
+
+As shown in the table below, see the highest number of incidents by type, 
+it continues to show Tornados as the deadliest category of events.
+
+```{r, results='asis'}
 #output the tables in html
 t1 = kable(fatalities, format='html', output = FALSE)
 t2 = kable(injuries, format='html', output = FALSE)
@@ -164,36 +206,9 @@ cat(c('<table><tr valign="top"><td>', t1, '</td><td>', t2, '</td><tr></table>'),
 ```
 
 ##Across the United States, which types of events have the greatest economic consequences?
+Floods have the most damage, as shown by the plot below
 
-```{r, fig.height=20}
-
-#Plot All Events by Category
-stormPropEcom <- stormData[!(stormData$PROPDMG == 0),]
-stormCropEcom <- stormData[!(stormData$CROPDMG == 0),]
-stormEcom <- aggregate(cbind(PROPDMG, PROPDMGEXP, CROPDMG) ~ Category, sum, data = 
-        stormData)
-stormHealth <- stormHealth[!(stormHealth$FATALITIES == 0 & 
-        stormHealth$INJURIES == 0),]
-#Melt data by category to allow for an easy barplot
-meltStormHealth <- melt(stormHealth, id="Category", variable.name="Health_Type", 
-        value.name="Number_Of_Incidents")
-p1 <- qplot(x=Category, y=Number_Of_Incidents, fill=Health_Type, 
-        data=meltStormHealth, geom="bar", stat="identity") + coord_flip()
-
-#Break down the "Largest Category"
-stormLargeHealth <- stormData[(stormData$Category == 
-        "Tornado/Gustnado/Funnel Cloud/Waterspout"),]
-stormLargeHealth <- aggregate(cbind(FATALITIES, INJURIES) ~ EVTYPE, sum, 
-        data = stormLargeHealth)
-stormLargeHealth <- stormLargeHealth[!(stormLargeHealth$FATALITIES == 0 & 
-        stormLargeHealth$INJURIES == 0),]
-#Melt data by category to allow for an easy barplot
-meltStormLargeHealth <- melt(stormLargeHealth, id="EVTYPE", 
-        variable.name="Health_Type", value.name="Number_Of_Incidents")
-p2 <- qplot(x=EVTYPE, y=Number_Of_Incidents, fill=Health_Type, 
-        data=meltStormLargeHealth, geom="bar", stat="identity") + 
-        coord_flip() + xlab("Event Type")
-
-grid.arrange(p1, p2, ncol = 1, main = "Health Events (Top= All Event Types, 
-        Bottom=Fine Grain Detail of Tornado/Gustnado/Funnel Cloud/Waterspoint category)")
+```{r}
+#Show total Damage barplot by Category
+qplot(x=Category, y=Total_Damage, data=stormEconAgg, geom="bar", stat="identity") + ggtitle("Total Damage by Event Category") + coord_flip()
 ```
